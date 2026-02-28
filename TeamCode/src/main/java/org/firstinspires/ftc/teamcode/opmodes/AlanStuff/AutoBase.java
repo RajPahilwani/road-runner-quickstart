@@ -63,6 +63,8 @@ public abstract class AutoBase extends LinearOpMode {
             robot.turret.setAim(true);
             robot.outake.setPresetVelocity(Outake.FarShotVelo);
             robot.outake.intakeOn();
+            packet.put("auto/action", "spinUpShooter");
+            packet.put("auto/targetShooterVelocity", Outake.FarShotVelo);
             return false; // ends immediately, spinning is handled by waitSeconds
         };
     }
@@ -71,21 +73,34 @@ public abstract class AutoBase extends LinearOpMode {
         final long start = System.currentTimeMillis();
         return packet -> {
             robot.update(true, true);
-            return (System.currentTimeMillis() - start) < seconds * 1000; // true = keep running
+            long elapsedMs = System.currentTimeMillis() - start;
+            packet.put("auto/action", "waitSeconds");
+            packet.put("auto/waitElapsedMs", elapsedMs);
+            packet.put("auto/waitTargetMs", seconds * 1000.0);
+            return elapsedMs < seconds * 1000; // true = keep running
         };
     }
 
     protected Action raiseTongue() {
-        return packet -> { robot.Tongue.setUp(); return false; };
+        return packet -> {
+            robot.Tongue.setUp();
+            packet.put("auto/action", "raiseTongue");
+            return false;
+        };
     }
 
     protected Action lowerTongue() {
-        return packet -> { robot.Tongue.setDown(); return false; };
+        return packet -> {
+            robot.Tongue.setDown();
+            packet.put("auto/action", "lowerTongue");
+            return false;
+        };
     }
 
     protected Action rotateSpindexer() {
         return packet -> {
             robot.spindexer.rotateByFraction(1.0 / 3.0);
+            packet.put("auto/action", "rotateSpindexer");
             return false;
         };
     }
@@ -95,20 +110,37 @@ public abstract class AutoBase extends LinearOpMode {
         return packet -> {
             robot.update(true,true);
 
-            if (robot.spindexer.isIdle() && robot.spindexer.getVisibleBallColor() != desiredColor) {
+            Spindexer.BallColor visibleColor = robot.spindexer.getVisibleBallColor();
+
+            if (robot.spindexer.isIdle() && visibleColor != desiredColor) {
                 robot.spindexer.rotateByFraction(1.0 / 3.0);
             }
 
-            return robot.spindexer.getVisibleBallColor() != desiredColor; // true = keep running until correct
+            packet.put("auto/action", "rotateSpindexerIfWrongColor");
+            packet.put("auto/desiredColor", desiredColor.name());
+            packet.put("auto/visibleColor", visibleColor == null ? "null" : visibleColor.name());
+            packet.put("auto/spindexerIdle", robot.spindexer.isIdle());
+
+            return visibleColor != desiredColor; // true = keep running until correct
         };
     }
 
     protected Action waitForSpindexerIdle() {
-        return packet -> { robot.update(true,true); return !robot.spindexer.isIdle(); };
+        return packet -> {
+            robot.update(true,true);
+            packet.put("auto/action", "waitForSpindexerIdle");
+            packet.put("auto/spindexerIdle", robot.spindexer.isIdle());
+            return !robot.spindexer.isIdle();
+        };
     }
 
     protected Action waitForTongueDown() {
-        return packet -> { robot.update(true,true); return !robot.Tongue.isDown(); };
+        return packet -> {
+            robot.update(true,true);
+            packet.put("auto/action", "waitForTongueDown");
+            packet.put("auto/tongueDown", robot.Tongue.isDown());
+            return !robot.Tongue.isDown();
+        };
     }
 
     protected Action holdIntakeWhileBallDetected(long timeoutMs) {
@@ -116,13 +148,20 @@ public abstract class AutoBase extends LinearOpMode {
         return packet -> {
             robot.intake.setPower(HOLD_INTAKE_POWER);
             robot.update(true,true);
-            return robot.spindexer.seesBall() && (System.currentTimeMillis() - start < timeoutMs);
+            long elapsedMs = System.currentTimeMillis() - start;
+            packet.put("auto/action", "holdIntakeWhileBallDetected");
+            packet.put("auto/seesBall", robot.spindexer.seesBall());
+            packet.put("auto/intakePower", HOLD_INTAKE_POWER);
+            packet.put("auto/elapsedMs", elapsedMs);
+            return robot.spindexer.seesBall() && elapsedMs < timeoutMs;
         };
     }
 
     protected Action continuousPatternScan() {
         return packet -> {
             pattern = detectPattern(pattern);
+            packet.put("auto/action", "continuousPatternScan");
+            packet.put("auto/pattern", pattern);
             return true; // always keep running
         };
     }
@@ -137,7 +176,13 @@ public abstract class AutoBase extends LinearOpMode {
                 robot.spindexer.rotateByFraction(1.0 / 3.0);
             }
 
-            return (System.currentTimeMillis() - start) < timeoutMs; // true = keep running until timeout
+            long elapsedMs = System.currentTimeMillis() - start;
+            packet.put("auto/action", "continuousIntakeAndIndex");
+            packet.put("auto/elapsedMs", elapsedMs);
+            packet.put("auto/timeoutMs", timeoutMs);
+            packet.put("auto/seesBall", robot.spindexer.seesBall());
+            packet.put("auto/spindexerIdle", robot.spindexer.isIdle());
+            return elapsedMs < timeoutMs; // true = keep running until timeout
         };
     }
 
