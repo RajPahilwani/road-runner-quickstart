@@ -58,7 +58,15 @@ public abstract class AutoBase extends LinearOpMode {
     }
 
     /* ===================== ATOMIC ACTIONS ===================== */
-    protected Action spinUpShooter() {
+    protected Action spinUpShooterClose() {
+        return packet -> {
+            robot.turret.setAim(true);
+            robot.outake.setPresetVelocity(Outake.CloseShotVelo);
+            robot.outake.intakeOn();
+            return false; // ends immediately, spinning is handled by waitSeconds
+        };
+    }
+    protected Action spinUpShooterFar() {
         return packet -> {
             robot.turret.setAim(true);
             robot.outake.setPresetVelocity(Outake.FarShotVelo);
@@ -91,15 +99,40 @@ public abstract class AutoBase extends LinearOpMode {
     }
 
     protected Action rotateSpindexerIfWrongColor(char desiredChar) {
-        final Spindexer.BallColor desiredColor = desiredChar == 'G' ? Spindexer.BallColor.GREEN : Spindexer.BallColor.PURPLE;
-        return packet -> {
-            robot.update(true,true);
 
-            if (robot.spindexer.isIdle() && robot.spindexer.getVisibleBallColor() != desiredColor) {
+        final Spindexer.BallColor desiredColor =
+                desiredChar == 'G'
+                        ? Spindexer.BallColor.GREEN
+                        : Spindexer.BallColor.PURPLE;
+
+        final long start = System.currentTimeMillis();
+        final long timeoutMs = 3000; // hard stop so it never hangs
+
+        return packet -> {
+
+            robot.update(true, true);
+
+            // If no ball is seen, do not hang
+            if (!robot.spindexer.seesBall()) {
+                return false;
+            }
+
+            // If correct color is visible, we are done
+            if (robot.spindexer.getVisibleBallColor() == desiredColor) {
+                return false;
+            }
+
+            // Rotate only when idle
+            if (robot.spindexer.isIdle()) {
                 robot.spindexer.rotateByFraction(1.0 / 3.0);
             }
 
-            return robot.spindexer.getVisibleBallColor() != desiredColor; // true = keep running until correct
+            // Hard timeout protection
+            if (System.currentTimeMillis() - start > timeoutMs) {
+                return false;
+            }
+
+            return true; // keep running
         };
     }
 
@@ -145,7 +178,7 @@ public abstract class AutoBase extends LinearOpMode {
     protected void doShotCycle(String pattern, int shots) {
 
 
-        Actions.runBlocking(spinUpShooter());
+        Actions.runBlocking(spinUpShooterClose());
         Actions.runBlocking(waitSeconds(SHOT_SPINUP_MS / 1000.0));
 
         for (int i = 0; i < shots; i++) {

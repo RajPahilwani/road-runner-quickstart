@@ -3,19 +3,10 @@ package org.firstinspires.ftc.teamcode.opmodes.auto;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
-import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.ParallelAction;
-import com.qualcomm.hardware.limelightvision.LLResult;
-import com.qualcomm.hardware.limelightvision.LLResultTypes;
-import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 
 import org.firstinspires.ftc.teamcode.opmodes.AlanStuff.AutoBase;
-import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
-import org.firstinspires.ftc.teamcode.subsystems.Outake;
-import org.firstinspires.ftc.teamcode.subsystems.Spindexer;
-
-import java.util.List;
 
 @Autonomous(name = "Blue Far Pattern", group = "Auto")
 public class BlueFarPattern extends AutoBase {
@@ -23,27 +14,19 @@ public class BlueFarPattern extends AutoBase {
     private static final Pose2d START_POSE = new Pose2d(60, -10, Math.toRadians(0));
     private static final Vector2d SCAN_POSE = new Vector2d(53, -13);
 
-    private static final long SHOT_SPINUP_MS = 2000;
-    private static final long SHOT_SETTLE_MS = 50;
-    private static final long FEED_SETTLE_MS = 50;
-
-    private Limelight3A limelight;
-    private String pattern = "PPG";
+    private static final long SHOT_SPINUP_MS = 1000;
 
     @Override
     public void runOpMode() {
-        startPose=START_POSE;
+
+        startPose = START_POSE;
         initialize();
-
-
-        limelight = hardwareMap.get(Limelight3A.class, "limelight");
-        limelight.pipelineSwitch(0);
-        limelight.start();
 
         robot.Tongue.setDown();
         robot.outake.intakeOff();
         robot.intake.intakeOff();
 
+        // ===== Wait for start and continuously update pattern =====
         while (!isStarted() && !isStopRequested()) {
             pattern = detectPattern(pattern);
             telemetry.addLine("Ready for auto");
@@ -57,21 +40,54 @@ public class BlueFarPattern extends AutoBase {
             return;
         }
 
-        // ===== Move to scan pose while scanning pattern =====
-        Actions.runBlocking(new ParallelAction(
-                drive.actionBuilder(START_POSE)
+        // ===== Move to scan position =====
+        Actions.runBlocking(
+                drive.actionBuilder(drive.localizer.getPose())
                         .strafeTo(SCAN_POSE)
-                        .turn(Math.toRadians(180))
-                        .turn(Math.toRadians(180))
-                        .turn(Math.toRadians(17.5))
-                        .build(),
-                continuousPatternScan()
-        ));
+                        .turn(Math.toRadians(90))
+                        .build()
+        );
 
-        // ===== Shoot first 3 balls =====
-        doShotCycle(pattern, 3);
+        pattern = detectPattern(pattern);
+
+        Actions.runBlocking(
+                drive.actionBuilder(drive.localizer.getPose())
+                        .strafeTo(SCAN_POSE)
+                        .turn(Math.toRadians(-90))
+                        .turn(Math.toRadians(-17.5))
+                        .build()
+        );
+
+        telemetry.addData("Got to before spinner", "pls");
+
+        // ===== Spin up shooter =====
+        Actions.runBlocking(spinUpShooterFar());
+        telemetry.addData("Got to spinner", "pls");
+        Actions.runBlocking(waitSeconds(SHOT_SPINUP_MS / 1000.0));
+
+        // ===== Shoot all 3 balls according to pattern =====
+        for (int i = 0; i < 3; i++) {
+
+            char desiredChar = Character.toUpperCase(pattern.charAt(Math.min(i, 2)));
+
+            Actions.runBlocking(rotateSpindexerIfWrongColor(desiredChar));
+            telemetry.addData("got past rotating spindexer", "good");
+
+            Actions.runBlocking(waitSeconds(1.5));
+
+            Actions.runBlocking(new ParallelAction(
+                    raiseTongue(),
+                    waitSeconds(2.5)
+            ));
+
+            Actions.runBlocking(new ParallelAction(
+                    lowerTongue(),
+                    waitSeconds(1)
+            ));
+
+            Actions.runBlocking(rotateSpindexer());
+        }
 
         safeStop();
     }
-
 }

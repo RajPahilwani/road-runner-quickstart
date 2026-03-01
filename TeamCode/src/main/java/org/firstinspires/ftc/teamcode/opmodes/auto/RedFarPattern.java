@@ -41,18 +41,25 @@ public class RedFarPattern extends AutoBase {
         }
 
         // ===== Move to scan position while spinning full +17.5 turn and scanning pattern =====
-        Actions.runBlocking(new ParallelAction(
+        Actions.runBlocking(
                 drive.actionBuilder(drive.localizer.getPose())
                         .strafeTo(SCAN_POSE)
-                        .turn(Math.toRadians(-270))
+                        .turn(Math.toRadians(90))
+                        .build()
+                //continuousPatternScan() // parallel Limelight scanning
+        );
+        pattern=detectPattern(pattern);
+        Actions.runBlocking(
+                drive.actionBuilder(drive.localizer.getPose())
+                        .strafeTo(SCAN_POSE)
                         .turn(Math.toRadians(-90))
                         .turn(Math.toRadians(-17.5))
                         .build()
                 //continuousPatternScan() // parallel Limelight scanning
-        ));
+        );
         telemetry.addData("Got to before spinner", "pls");
         // ===== Spin up shooter =====
-        Actions.runBlocking(spinUpShooter());
+        Actions.runBlocking(spinUpShooterFar());
         telemetry.addData("Got to spinner", "pls");
         Actions.runBlocking(waitSeconds(SHOT_SPINUP_MS / 1000.0));
 
@@ -70,9 +77,6 @@ public class RedFarPattern extends AutoBase {
             Actions.runBlocking(rotateSpindexer());
         }
 
-        Actions.runBlocking(new ParallelAction(raiseTongue(), waitSeconds(2)));
-
-        Actions.runBlocking(new ParallelAction(lowerTongue(), waitSeconds(2)));
 
 
         safeStop();

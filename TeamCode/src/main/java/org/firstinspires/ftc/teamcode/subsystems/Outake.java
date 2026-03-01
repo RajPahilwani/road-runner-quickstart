@@ -14,9 +14,9 @@ public class Outake extends Subsystem {
     private final Telemetry telemetry;
 
     /* ===== Preset Velocities (RPM) ===== */
-    public static int FarShotVelo = 2400;
+    public static int FarShotVelo = 3800;
     public static int MediumShotVelo = 1680;
-    public static int CloseShotVelo = 1450;
+    public static int CloseShotVelo = 2800;
     public static int AutoFarShotVelo = 1650;
 
     /* ===== State ===== */
