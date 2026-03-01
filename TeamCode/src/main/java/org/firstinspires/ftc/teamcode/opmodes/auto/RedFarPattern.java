@@ -44,31 +44,36 @@ public class RedFarPattern extends AutoBase {
         Actions.runBlocking(new ParallelAction(
                 drive.actionBuilder(drive.localizer.getPose())
                         .strafeTo(SCAN_POSE)
-                        .turn(Math.toRadians(-180))
-                        .turn(Math.toRadians(-180))
+                        .turn(Math.toRadians(-270))
+                        .turn(Math.toRadians(-90))
                         .turn(Math.toRadians(-17.5))
-                        .build(),
-                continuousPatternScan() // parallel Limelight scanning
+                        .build()
+                //continuousPatternScan() // parallel Limelight scanning
         ));
-
+        telemetry.addData("Got to before spinner", "pls");
         // ===== Spin up shooter =====
         Actions.runBlocking(spinUpShooter());
+        telemetry.addData("Got to spinner", "pls");
         Actions.runBlocking(waitSeconds(SHOT_SPINUP_MS / 1000.0));
 
         // ===== Shoot all 3 balls safely according to pattern =====
         for (int i = 0; i < 3; i++) {
             char desiredChar = Character.toUpperCase(pattern.charAt(Math.min(i, 2)));
             Actions.runBlocking(rotateSpindexerIfWrongColor(desiredChar));
-            Actions.runBlocking(waitForSpindexerIdle());
+            telemetry.addData("got past rotating spindexer", "good");
+            Actions.runBlocking(waitSeconds(1.5));
 
-            Actions.runBlocking(raiseTongue());
-            Actions.runBlocking(waitSeconds(FEED_SETTLE_MS / 1000.0));
-            Actions.runBlocking(lowerTongue());
-            Actions.runBlocking(waitForTongueDown());
+            Actions.runBlocking(new ParallelAction(raiseTongue(), waitSeconds(2.5)));
+
+            Actions.runBlocking(new ParallelAction(lowerTongue(), waitSeconds(1)));
 
             Actions.runBlocking(rotateSpindexer());
-            Actions.runBlocking(waitForSpindexerIdle());
         }
+
+        Actions.runBlocking(new ParallelAction(raiseTongue(), waitSeconds(2)));
+
+        Actions.runBlocking(new ParallelAction(lowerTongue(), waitSeconds(2)));
+
 
         safeStop();
     }
